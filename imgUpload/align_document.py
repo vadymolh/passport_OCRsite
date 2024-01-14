@@ -32,7 +32,7 @@ def align_image(image_path, template_path, output_folder, maxFeatures=15000, kee
     aligned = align_images(image, template, maxFeatures=maxFeatures, keepPercent=keepPercent, debug=debug)
     result = aligned.copy()
 
-    cv2.imwrite(os.path.join(output_folder, os.path.splitext(os.path.basename(image_path))[0] + "_aligned.jpg"), aligned)
+    # cv2.imwrite(os.path.join(output_folder, os.path.splitext(os.path.basename(image_path))[0] + "_aligned.jpg"), aligned)
 
     # Resize both the aligned and template images so we can easily
     # visualize them on our screen.
