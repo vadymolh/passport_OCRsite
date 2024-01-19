@@ -10,6 +10,7 @@ import json
 from .align_document import align_image
 from passporteye import read_mrz
 import pytesseract
+from .models import Person, Scan, Image
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
@@ -27,6 +28,34 @@ def process_image(image_path):
     print(formatted_text)
     
     return extracted_fields
+
+
+# TO SAVE SCAN DATA to DB
+def save_scan(img_obj, fields,  user_latitude, user_longitude):
+
+    # CHEK IF PERSON IS ALREADY IN DB
+    try:
+        Person.objects.get(ID_number=fields['passport_number'])
+        current_person = Person.objects.get(ID_number=fields['passport_number'])
+    except Person.DoesNotExist:
+        current_person = Person.objects.create(
+            ID_number=fields['passport_number'],
+            name = fields['name'].split()[0],
+            surname = fields['name'].split()[1],
+            sex=fields['sex'],
+            birthdate=fields['date_of_birth'],
+            nationality=fields['nationality'],
+            expire=fields['expiry_date'])
+        current_person.save()
+
+    # SAVE CURRENT SCAN IN DB
+    scan = Scan.objects.create(
+        person=current_person,
+        GEO_location = f"{user_latitude} {user_longitude}",
+        image = img_obj)
+    scan.save()
+    return {"person": current_person, "scan": scan}
+
 
 
 def upload(request):
@@ -59,11 +88,32 @@ def upload(request):
     # location_city = location["city"]
     
     if request.method == 'POST':
+        print(request.POST)
         form = ImageForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
             img_obj = form.instance
             image_path = img_obj.image.path
+
+
+            # Get user's geolocation
+            if request.POST['latitude']:
+                user_latitude = request.POST['latitude']
+                user_longitude = request.POST['longitude']
+            # user_ip = request.META.get('REMOTE_ADDR')
+            # g = GeoIP2(path=os.path.join(script_directory, 'geolite2-data'))
+            # try:
+            #     user_location = g.city(user_ip)
+            #     user_latitude = user_location['latitude']
+            #     user_longitude = user_location['longitude']
+                
+            #     print(f"User's geolocation: Latitude - {user_latitude}, Longitude - {user_longitude}")
+
+            # except Exception as e:
+            else:
+                user_latitude = None  
+                user_longitude = None  
+                print(f"Error getting user's geolocation")
 
             # # Get user's geolocation
             # user_ip = request.META.get('REMOTE_ADDR')
@@ -86,6 +136,7 @@ def upload(request):
             f"Sex: {fields['sex']}\n" \
             f"Nationality: {fields['nationality']}\n"
             
+            save_scan(img_obj, fields,  user_latitude, user_longitude)
             context = {
                 'form': form,
                 'img_obj': img_obj,
